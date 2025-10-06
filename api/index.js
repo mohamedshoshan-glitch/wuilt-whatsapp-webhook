@@ -4,27 +4,27 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
   try {
-    const { event, payload } = req.body;
+    const data = req.body.data || req.body; // بعض منصات wuilt ترسل داخل data
+    const event = data?.event;
+    const order = data?.payload?.order;
 
-    console.info("✅ New request from Wuilt:", req.body);
+    console.info("✅ New request from Wuilt:", data);
 
-    const order = payload?.order;
     if (!order) throw new Error("No order found in payload");
 
     const customer = order.customer;
     const phone = customer?.phone?.replace(/\s+/g, "");
     const name = customer?.name || "العميل";
 
-    // تحديد الرسالة بناء على نوع الحدث
     let message = "";
 
     switch (event) {
-      case "ORDER_CREATED":
+      case "ORDER_PLACED":
         message = `مرحبًا ${name} 👋\nتم استلام طلبك بنجاح ✅\nرقم الطلب: ${order.orderSerial}\nهنقوم بالتواصل معك قريب لتأكيد التفاصيل.\nشكرًا لاختيارك دجاج سيزر 🐔❤️`;
         break;
 
       case "ORDER_CANCELED":
-        message = `عزيزي ${name} 😔\nيؤسفنا إبلاغك أنه تم إلغاء طلبك رقم ${order.orderSerial}.\nلو تم الإلغاء عن طريق الخطأ، تقدر تعيد الطلب من خلال موقعنا www.ceasarchicken.com`;
+        message = `عزيزي ${name} 😔\nتم إلغاء طلبك رقم ${order.orderSerial}.\nلو تم الإلغاء عن طريق الخطأ، يمكنك إعادة الطلب من موقعنا www.ceasarchicken.com`;
         break;
 
       case "ORDER_FULFILLED":
@@ -32,11 +32,11 @@ export default async function handler(req, res) {
         break;
 
       case "ORDER_REFUNDED":
-        message = `مرحبًا ${name} 👋\nتم رد المبلغ لطلبك رقم ${order.orderSerial} بنجاح 💰\nفي حال وجود أي استفسار، برجاء التواصل معنا.`;
+        message = `مرحبًا ${name} 👋\nتم رد المبلغ لطلبك رقم ${order.orderSerial} بنجاح 💰\nلو عندك أي استفسار، تواصل معنا على رقم الدعم.`;
         break;
 
       default:
-        console.info(`⚠️ Event ${event} غير مدعوم حاليًا، تم تجاهله.`);
+        console.info(`⚠️ Event ${event} غير مدعوم حاليًا.`);
         return res.status(200).send("Ignored event");
     }
 
@@ -45,7 +45,6 @@ export default async function handler(req, res) {
     console.info("📞 Sending WhatsApp to:", phone);
     console.info("💬 Message:", message);
 
-    // إرسال الرسالة عبر WhatsApp Cloud API
     const response = await axios.post(
       `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
