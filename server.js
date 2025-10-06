@@ -1,129 +1,93 @@
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+import express from "express";
+import bodyParser from "body-parser";
+import axios from "axios";
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(200).send("✅ Wuilt WhatsApp Webhook is running");
+const app = express();
+app.use(bodyParser.json());
+
+// ثابت
+const VERIFY_TOKEN = "wuilt_webhook_verify";
+const WHATSAPP_TOKEN = "YOUR_WHATSAPP_TOKEN";
+const PHONE_NUMBER_ID = "YOUR_PHONE_NUMBER_ID";
+const SUPPORT_PHONE = "+201234567890"; // رقم الدعم الفني
+
+// تحقق من التوكن لما wuilt تعمل verification
+app.get("/api", (req, res) => {
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  if (mode && token === VERIFY_TOKEN) {
+    return res.status(200).send(challenge);
+  } else {
+    return res.sendStatus(403);
   }
+});
 
+// استقبال بيانات الطلبات من Wuilt
+app.post("/api", async (req, res) => {
   try {
-    const body = req.body.data || req.body;
-    let event = body?.event || "";
-    const order = body?.payload?.order || body?.order;
+    const data = req.body;
 
-    if (!order) {
-      console.error("❌ Missing order data:", req.body);
-      return res.status(400).json({ error: "Invalid payload" });
+    if (!data || !data.event || !data.data) {
+      console.log("Invalid payload:", data);
+      return res.sendStatus(400);
     }
 
-    // 🧠 لو الحدث فاضي أو مش واضح نحدده من حالة الطلب
-    if (!event || event === "ORDER_UPDATED" || event === "ORDER_CHANGED") {
-      if (order.isCanceled) event = "ORDER_CANCELED";
-      else if (order.paymentStatus === "PAID") event = "ORDER_PAID";
-      else if (order.fulfillmentStatus === "FULFILLED") event = "ORDER_FULFILLED";
-      else event = "ORDER_CREATED";
-    }
+    const eventType = data.event;
+    const order = data.data;
+    const customerName = order.customer?.name || "العميل";
+    const customerPhone = order.customer?.phone?.replace("+", "");
+    const orderId = order.id;
+    const orderTotal = order.total || "غير محدد";
+    const trackingNumber = order.tracking_number || "—";
+    const deliveryEstimate = order.delivery_estimate || "قريبًا";
 
-    console.log("🧩 Detected event:", event);
-    console.log("🧾 Order data:", {
-      isCanceled: order.isCanceled,
-      paymentStatus: order.paymentStatus,
-      fulfillmentStatus: order.fulfillmentStatus,
-    });
+    // بناء الرسالة حسب نوع الحدث
+    let messageTemplate = "";
 
-    const customer = order.customer || {};
-    let customerPhone = customer.phone || order.shippingAddress?.phone || "";
-    const customerName = customer.name || "عميلنا العزيز";
-
-    if (customerPhone.startsWith("0")) customerPhone = "+2" + customerPhone.substring(1);
-    else if (!customerPhone.startsWith("+")) customerPhone = "+2" + customerPhone;
-
-    const orderNumber = order.orderSerial || order._id;
-    const orderTotal = `${order.totalPrice.amount} ${order.totalPrice.currencyCode}`;
-    const supportPhone = order.storeData?.phone || "+201508640042";
-    const trackingNumber = order.trackingNumber || "—";
-    const deliveryEstimate = order.deliveryEstimate || "خلال 24 ساعة";
-
-    let templateName = "";
-    let parameters = [];
-
-    switch (event) {
-      case "ORDER_CREATED":
-        templateName = "order_confirmation";
-        parameters = [
-          { type: "text", text: customerName },
-          { type: "text", text: orderNumber },
-          { type: "text", text: orderTotal },
-        ];
+    switch (eventType) {
+      case "order.created":
+        messageTemplate = `مرحبًا ${customerName} 👋\nتم استلام طلبك رقم ${orderId} بنجاح ✅\nقيمة الطلب: ${orderTotal}\nهنقوم بالتواصل معك قريب لتأكيد التفاصيل.\nشكرًا لاختيارك دجاج سيزر 🐔❤️`;
         break;
 
-      case "ORDER_CANCELED":
-        templateName = "order_canceled";
-        parameters = [
-          { type: "text", text: customerName },
-          { type: "text", text: orderNumber },
-          { type: "text", text: supportPhone },
-        ];
+      case "order.canceled":
+        messageTemplate = `مرحبًا ${customerName} 😔\nنأسف لإبلاغك أن طلب رقم ${orderId} تم إلغاؤه.\nلو رغبت بإعادة الطلب أو لديك استفسار، تواصل معنا: ${SUPPORT_PHONE}`;
         break;
 
-      case "ORDER_PAID":
-        templateName = "order_paid";
-        parameters = [
-          { type: "text", text: customerName },
-          { type: "text", text: orderNumber },
-          { type: "text", text: orderTotal },
-        ];
+      case "order.paid":
+        messageTemplate = `مرحبًا ${customerName} ✅\nتم تأكيد الدفع لطلب رقم ${orderId} بمبلغ ${orderTotal}.\nسنبدأ في تجهيز طلبك الآن.`;
         break;
 
-      case "ORDER_FULFILLED":
-        templateName = "order_shipped";
-        parameters = [
-          { type: "text", text: customerName },
-          { type: "text", text: orderNumber },
-          { type: "text", text: deliveryEstimate },
-          { type: "text", text: trackingNumber },
-        ];
+      case "order.fulfilled":
+        messageTemplate = `مرحبًا ${customerName} 🚚\nطلبك رقم ${orderId} خرج للشحن — متوقع الوصول خلال ${deliveryEstimate}.\nرقم التتبع: ${trackingNumber}`;
         break;
 
       default:
-        console.log("⚠️ Unhandled event:", event);
-        return res.status(200).json({ success: true, message: "Event ignored" });
+        console.log("غير معروف نوع الحدث:", eventType);
+        return res.sendStatus(200);
     }
 
-    const payload = {
-      messaging_product: "whatsapp",
-      to: customerPhone,
-      type: "template",
-      template: {
-        name: templateName,
-        language: { code: "ar" },
-        components: [
-          {
-            type: "body",
-            parameters: parameters,
-          },
-        ],
-      },
-    };
-
-    const response = await fetch(
-      `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-          "Content-Type": "application/json",
+    // إرسال الرسالة عبر واتساب
+    if (customerPhone && messageTemplate) {
+      await axios.post(
+        `https://graph.facebook.com/v17.0/${PHONE_NUMBER_ID}/messages`,
+        {
+          messaging_product: "whatsapp",
+          to: customerPhone,
+          type: "text",
+          text: { body: messageTemplate },
         },
-        body: JSON.stringify(payload),
-      }
-    );
+        { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` } }
+      );
+      console.log(`📩 رسالة أُرسلت إلى ${customerPhone} (${eventType})`);
+    }
 
-    const result = await response.json();
-    console.log("📦 WhatsApp API response:", result);
-
-    return res.status(200).json({ success: true, result });
-  } catch (error) {
-    console.error("❌ Error:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("Error handling webhook:", err.response?.data || err.message);
+    res.sendStatus(500);
   }
-}
+});
+
+app.listen(3000, () => console.log("🚀 Server running on port 3000"));
