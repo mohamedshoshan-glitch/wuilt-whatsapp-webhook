@@ -7,7 +7,9 @@ export default async function handler(req, res) {
     try {
       console.log("✅ Received Order from Wuilt:", req.body);
 
-      const order = req.body;
+      const order = const order = req.body.data?.payload?.order || {};
+      console.log("🧾 Order Object:", order);
+console.log("📱 Customer:", order.customer);
       const customerName = order.customer?.name || "عميلنا العزيز";
       let customerPhone = order.customer?.phone || "";
 
