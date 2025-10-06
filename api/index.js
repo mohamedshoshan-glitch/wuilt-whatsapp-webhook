@@ -1,5 +1,5 @@
-const WHATSAPP_TOKEN = "YOUR_WHATSAPP_CLOUD_API_TOKEN";
-const PHONE_NUMBER_ID = "YOUR_PHONE_NUMBER_ID";
+const WHATSAPP_TOKEN = "EAAPnaEVSsi4BPpOj25BgAxqjxpEB2nlKvptoIm9z4Ni1C4apdJrIX6Faa6I09ZBktisZBtt4qCvtBZCbGgi3SFiv6515Cnhw4aFaQrocoEkKk5IA3SGDzehA4hwveWVfoNe27iHEukK4Aj0EoXE9oiFAsn4sFFVNoIzHUIS7IBi6jAF36gk1nF0AsjPyLIfMRw7R9uxSO493q6LnFcc0PMLKz3EJbHlq9kcDmZBJpTZAQVqoE7g9ZA5ujy8ckZD";
+const PHONE_NUMBER_ID = "839520552574293";
 
 export default async function handler(req, res) {
   if (req.method === "POST") {
@@ -29,11 +29,11 @@ export default async function handler(req, res) {
       console.log("💬 Message:", message);
 
       const response = await fetch(
-        `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+        `https://graph.facebook.com/v20.0/${839520552574293}/messages`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+            Authorization: `Bearer ${EAAPnaEVSsi4BPpOj25BgAxqjxpEB2nlKvptoIm9z4Ni1C4apdJrIX6Faa6I09ZBktisZBtt4qCvtBZCbGgi3SFiv6515Cnhw4aFaQrocoEkKk5IA3SGDzehA4hwveWVfoNe27iHEukK4Aj0EoXE9oiFAsn4sFFVNoIzHUIS7IBi6jAF36gk1nF0AsjPyLIfMRw7R9uxSO493q6LnFcc0PMLKz3EJbHlq9kcDmZBJpTZAQVqoE7g9ZA5ujy8ckZD}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
