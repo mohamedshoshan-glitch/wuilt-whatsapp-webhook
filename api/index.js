@@ -1,8 +1,8 @@
 // api/index.js
 
 // استبدل التوكن والبزنس ID ببياناتك من Meta for Developers
-const WHATSAPP_TOKEN = "EAASMOvuYpAgBPiZAEiY62aj80Oa77neowrcG928iGZBdNWdpMbXZAonimRdV1R2kTRTkpfjMMMmn149qMkxQPuaqhSbnXVkBmd9BBC1JaLJE80VNRxqcgzEEKRjuGHilzfiZC0OyIFMz961A7w3hqocuoWicPKZCyDRcNO0p7Lsw6PnZBpU0eZCuSNgPEmUHq9ZCzL0HTvajunumZA9T3RAJBPRumdGBXoXyFSWgieuTcLwZDZD";
-const PHONE_NUMBER_ID = "853519121172052";
+const WHATSAPP_TOKEN = "EAAPnaEVSsi4BPi6XOmwzd058fOOIGZC3uJJbwUga0H8I4He7KL49HYZAxcJSlBVcmfrC2AHBYMA0iEeOtgbEnYBoAmNbcw0IyeJqw0W9XyZCzdOZCvqyVd9TVg4IDMbv24AvxfxIEPvyRuoeZBQvF5mq52glZChPSckrld7Oh9Ag3X8AFiO351zsiunkZB5uz0jaI16ZAEbDaIcbcCOfl8paodlpuXsZBcMhMvQENC592Wsv8hBl9Fq9jYYAgIQZDZD";
+const PHONE_NUMBER_ID = "839520552574293";
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -24,10 +24,10 @@ export default async function handler(req, res) {
 
       // إرسال الرسالة عبر واتساب Cloud API
       if (customerPhone) {
-        await fetch(`https://graph.facebook.com/v20.0/${853519121172052}/messages`, {
+        await fetch(`https://graph.facebook.com/v20.0/${839520552574293}/messages`, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${EAASMOvuYpAgBPiZAEiY62aj80Oa77neowrcG928iGZBdNWdpMbXZAonimRdV1R2kTRTkpfjMMMmn149qMkxQPuaqhSbnXVkBmd9BBC1JaLJE80VNRxqcgzEEKRjuGHilzfiZC0OyIFMz961A7w3hqocuoWicPKZCyDRcNO0p7Lsw6PnZBpU0eZCuSNgPEmUHq9ZCzL0HTvajunumZA9T3RAJBPRumdGBXoXyFSWgieuTcLwZDZD}`,
+            "Authorization": `Bearer ${EAAPnaEVSsi4BPi6XOmwzd058fOOIGZC3uJJbwUga0H8I4He7KL49HYZAxcJSlBVcmfrC2AHBYMA0iEeOtgbEnYBoAmNbcw0IyeJqw0W9XyZCzdOZCvqyVd9TVg4IDMbv24AvxfxIEPvyRuoeZBQvF5mq52glZChPSckrld7Oh9Ag3X8AFiO351zsiunkZB5uz0jaI16ZAEbDaIcbcCOfl8paodlpuXsZBcMhMvQENC592Wsv8hBl9Fq9jYYAgIQZDZD}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
