@@ -1,5 +1,3 @@
-import fetch from "node-fetch";
-
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
@@ -9,67 +7,94 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log("✅ New request from Wuilt:", req.body);
-
     const data = req.body.data;
     const event = data?.event;
     const order = data?.payload?.order;
 
-    if (!event || !order) {
-      console.error("❌ Missing event or order in payload");
+    if (!order || !event) {
       return res.status(400).json({ error: "Invalid payload" });
     }
 
     const customer = order.customer || {};
-    let customerPhone = customer.phone || "";
+    let customerPhone = customer.phone || order.shippingAddress?.phone || "";
     const customerName = customer.name || "عميلنا العزيز";
 
-    // إصلاح صيغة الرقم الدولي
-    if (customerPhone.startsWith("0")) {
-      customerPhone = "+2" + customerPhone.substring(1);
-    } else if (!customerPhone.startsWith("+")) {
-      customerPhone = "+2" + customerPhone;
-    }
+    // رقم الهاتف بصيغة دولية
+    if (customerPhone.startsWith("0")) customerPhone = "+2" + customerPhone.substring(1);
+    else if (!customerPhone.startsWith("+")) customerPhone = "+2" + customerPhone;
 
     const orderNumber = order.orderSerial || order._id;
+    const orderTotal = `${order.totalPrice.amount} ${order.totalPrice.currencyCode}`;
+    const supportPhone = order.storeData?.phone || "+201508640042";
+    const trackingNumber = order.trackingNumber || "—";
+    const deliveryEstimate = order.deliveryEstimate || "خلال 24 ساعة";
 
-    // 🧩 تحديد نوع الرسالة حسب الحدث
-    let templateName;
-    let messageParams = [];
+    // تحديد القالب المناسب
+    let templateName = "";
+    let parameters = [];
 
     switch (event) {
+      case "ORDER_PLACED":
       case "ORDER_CREATED":
-        templateName = "order_confirmation";
-        messageParams = [customerName, orderNumber];
+        templateName = "order_confirmation"; // نفس اسم القالب في واتساب
+        parameters = [
+          { type: "text", text: customerName },
+          { type: "text", text: orderNumber },
+          { type: "text", text: orderTotal },
+        ];
         break;
 
       case "ORDER_CANCELED":
         templateName = "order_canceled";
-        messageParams = [customerName, orderNumber];
-        break;
-
-      case "ORDER_FULFILLED":
-        templateName = "order_shipped";
-        messageParams = [orderNumber, "الـ ٢٤ ساعة القادمة"];
-        break;
-
-      case "ORDER_REFUNDED":
-        templateName = "order_refunded";
-        messageParams = [customerName, orderNumber];
+        parameters = [
+          { type: "text", text: customerName },
+          { type: "text", text: orderNumber },
+          { type: "text", text: supportPhone },
+        ];
         break;
 
       case "ORDER_PAID":
         templateName = "order_paid";
-        messageParams = [customerName, orderNumber];
+        parameters = [
+          { type: "text", text: customerName },
+          { type: "text", text: orderNumber },
+          { type: "text", text: orderTotal },
+        ];
+        break;
+
+      case "ORDER_FULFILLED":
+        templateName = "order_shipped";
+        parameters = [
+          { type: "text", text: customerName },
+          { type: "text", text: orderNumber },
+          { type: "text", text: deliveryEstimate },
+          { type: "text", text: trackingNumber },
+        ];
         break;
 
       default:
-        console.log("ℹ️ Ignored event type:", event);
-        return res.status(200).json({ ignored: true });
+        console.log("⚠️ Unhandled event:", event);
+        return res.status(200).json({ success: true, message: "Event ignored" });
     }
 
-    console.log(`📩 Sending template "${templateName}" to ${customerPhone}`);
+    // إعداد بيانات الإرسال
+    const payload = {
+      messaging_product: "whatsapp",
+      to: customerPhone,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: "ar" },
+        components: [
+          {
+            type: "body",
+            parameters: parameters,
+          },
+        ],
+      },
+    };
 
+    // إرسال الطلب إلى WhatsApp API
     const response = await fetch(
       `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`,
       {
@@ -78,24 +103,7 @@ export default async function handler(req, res) {
           Authorization: `Bearer ${WHATSAPP_TOKEN}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: customerPhone,
-          type: "template",
-          template: {
-            name: templateName,
-            language: { code: "ar" },
-            components: [
-              {
-                type: "body",
-                parameters: messageParams.map((param) => ({
-                  type: "text",
-                  text: param,
-                })),
-              },
-            ],
-          },
-        }),
+        body: JSON.stringify(payload),
       }
     );
 
@@ -104,7 +112,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ success: true, result });
   } catch (error) {
-    console.error("❌ Error in handler:", error);
+    console.error("❌ Error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 }
