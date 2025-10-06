@@ -1,5 +1,5 @@
 const WHATSAPP_TOKEN = "EAAPnaEVSsi4BPpOj25BgAxqjxpEB2nlKvptoIm9z4Ni1C4apdJrIX6Faa6I09ZBktisZBtt4qCvtBZCbGgi3SFiv6515Cnhw4aFaQrocoEkKk5IA3SGDzehA4hwveWVfoNe27iHEukK4Aj0EoXE9oiFAsn4sFFVNoIzHUIS7IBi6jAF36gk1nF0AsjPyLIfMRw7R9uxSO493q6LnFcc0PMLKz3EJbHlq9kcDmZBJpTZAQVqoE7g9ZA5ujy8ckZD";
-const PHONE_NUMBER_ID = "839520552574293";
+const PHONE_NUMBER_ID = "839520552574293"; 
 
 export default async function handler(req, res) {
   if (req.method === "POST") {
