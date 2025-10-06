@@ -1,115 +1,71 @@
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-
-// Cache to prevent duplicate messages within short period
-const sentOrders = new Map();
+import axios from "axios";
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(200).send("✅ Wuilt WhatsApp Webhook is running");
-  }
+  if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
   try {
-    console.log("✅ New request from Wuilt:", req.body);
+    const { event, payload } = req.body;
 
-    const data = req.body.data;
-    if (!data) {
-      console.error("❌ No data received from Wuilt");
-      return res.status(400).json({ error: "Invalid payload" });
-    }
+    console.info("✅ New request from Wuilt:", req.body);
 
-    const eventType = data.event;
-    const order = data?.payload?.order;
+    const order = payload?.order;
+    if (!order) throw new Error("No order found in payload");
 
-    if (!order) {
-      console.error("❌ No order object found in payload");
-      return res.status(400).json({ error: "No order data" });
-    }
+    const customer = order.customer;
+    const phone = customer?.phone?.replace(/\s+/g, "");
+    const name = customer?.name || "العميل";
 
-    const customer = order.customer || {};
-    let customerPhone = customer.phone || "";
-
-    if (!customerPhone) {
-      console.error("❌ Missing customer phone number");
-      return res.status(400).json({ error: "No phone" });
-    }
-
-    // Normalize phone number
-    if (customerPhone.startsWith("0")) {
-      customerPhone = "+2" + customerPhone.substring(1);
-    } else if (!customerPhone.startsWith("+")) {
-      customerPhone = "+2" + customerPhone;
-    }
-
-    const orderNumber = order.orderSerial || order._id;
-    const customerName = customer.name || "عميلنا العزيز";
-
-    // Prevent duplicate messages for the same order within 3 minutes
-    const cacheKey = `${eventType}-${orderNumber}`;
-    const lastSent = sentOrders.get(cacheKey);
-    if (lastSent && Date.now() - lastSent < 180000) {
-      console.log(`⚠️ Skipped duplicate message for ${cacheKey}`);
-      return res.status(200).json({ message: "Duplicate skipped" });
-    }
-
+    // تحديد الرسالة بناء على نوع الحدث
     let message = "";
 
-    // Choose message based on event type
-    switch (eventType) {
-      case "ORDER_PLACED":
-        message = `مرحبًا ${customerName} 👋
-تم استلام طلبك بنجاح ✅
-رقم الطلب: ${orderNumber}
-هنقوم بالتواصل معك قريب لتأكيد التفاصيل.
-شكرًا لاختيارك دجاج سيزر 🐔❤️`;
+    switch (event) {
+      case "ORDER_CREATED":
+        message = `مرحبًا ${name} 👋\nتم استلام طلبك بنجاح ✅\nرقم الطلب: ${order.orderSerial}\nهنقوم بالتواصل معك قريب لتأكيد التفاصيل.\nشكرًا لاختيارك دجاج سيزر 🐔❤️`;
         break;
 
       case "ORDER_CANCELED":
-        message = `مرحبًا ${customerName} 👋
-تم إلغاء طلبك رقم ${orderNumber} ❌
-لو في أي مشكلة حصلت أثناء الطلب، ياريت تبلغنا عشان نساعدك 😊`;
+        message = `عزيزي ${name} 😔\nيؤسفنا إبلاغك أنه تم إلغاء طلبك رقم ${order.orderSerial}.\nلو تم الإلغاء عن طريق الخطأ، تقدر تعيد الطلب من خلال موقعنا www.ceasarchicken.com`;
         break;
 
       case "ORDER_FULFILLED":
-        message = `مرحبًا ${customerName} 👋
-طلبك رقم ${orderNumber} تم تجهيزه وجاري التوصيل 🚚
-تابع حالة الطلب من موقعنا أو التطبيق 📦`;
+        message = `أهلاً ${name} 🎉\nطلبك رقم ${order.orderSerial} تم تجهيزه وجاري شحنه إليك 🚚💨\nشكرًا لاختيارك دجاج سيزر 🐔`;
+        break;
+
+      case "ORDER_REFUNDED":
+        message = `مرحبًا ${name} 👋\nتم رد المبلغ لطلبك رقم ${order.orderSerial} بنجاح 💰\nفي حال وجود أي استفسار، برجاء التواصل معنا.`;
         break;
 
       default:
-        console.log("⚪ Ignored Event:", eventType);
-        return res.status(200).json({ message: "Event ignored" });
+        console.info(`⚠️ Event ${event} غير مدعوم حاليًا، تم تجاهله.`);
+        return res.status(200).send("Ignored event");
     }
 
-    console.log("📞 Sending WhatsApp to:", customerPhone);
-    console.log("💬 Message:", message);
+    if (!phone) throw new Error("No phone number found");
 
-    const response = await fetch(
-      `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+    console.info("📞 Sending WhatsApp to:", phone);
+    console.info("💬 Message:", message);
+
+    // إرسال الرسالة عبر WhatsApp Cloud API
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
-        method: "POST",
+        messaging_product: "whatsapp",
+        to: phone,
+        text: { body: message },
+      },
+      {
         headers: {
-          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: customerPhone,
-          type: "text",
-          text: { body: message },
-        }),
       }
     );
 
-    const result = await response.json();
-    console.log("📦 WhatsApp API response:", result);
+    console.info("📦 WhatsApp API response:", response.data);
 
-    // Mark order as notified
-    sentOrders.set(cacheKey, Date.now());
-
-    return res.status(200).json({ success: true, result });
+    return res.status(200).json({ success: true });
   } catch (error) {
-    console.error("❌ Error in handler:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    console.error("❌ Error in webhook handler:", error.message);
+    return res.status(500).json({ error: error.message });
   }
 }
