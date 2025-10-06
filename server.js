@@ -4,8 +4,8 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json());
 
-const WHATSAPP_TOKEN = "YOUR_ACCESS_TOKEN";
-const PHONE_NUMBER_ID = "YOUR_PHONE_NUMBER_ID";
+const WHATSAPP_TOKEN = "EAAPnaEVSsi4BPi6XOmwzd058fOOIGZC3uJJbwUga0H8I4He7KL49HYZAxcJSlBVcmfrC2AHBYMA0iEeOtgbEnYBoAmNbcw0IyeJqw0W9XyZCzdOZCvqyVd9TVg4IDMbv24AvxfxIEPvyRuoeZBQvF5mq52glZChPSckrld7Oh9Ag3X8AFiO351zsiunkZB5uz0jaI16ZAEbDaIcbcCOfl8paodlpuXsZBcMhMvQENC592Wsv8hBl9Fq9jYYAgIQZDZD";
+const PHONE_NUMBER_ID = "839520552574293";
 
 app.get("/", (req, res) => {
   res.send("Wuilt WhatsApp Webhook is running ✅");
@@ -30,10 +30,10 @@ ${items}
 `;
 
   try {
-    const response = await fetch(`https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`, {
+    const response = await fetch(`https://graph.facebook.com/v19.0/${839520552574293}/messages`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        Authorization: `Bearer ${EAAPnaEVSsi4BPi6XOmwzd058fOOIGZC3uJJbwUga0H8I4He7KL49HYZAxcJSlBVcmfrC2AHBYMA0iEeOtgbEnYBoAmNbcw0IyeJqw0W9XyZCzdOZCvqyVd9TVg4IDMbv24AvxfxIEPvyRuoeZBQvF5mq52glZChPSckrld7Oh9Ag3X8AFiO351zsiunkZB5uz0jaI16ZAEbDaIcbcCOfl8paodlpuXsZBcMhMvQENC592Wsv8hBl9Fq9jYYAgIQZDZD}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
