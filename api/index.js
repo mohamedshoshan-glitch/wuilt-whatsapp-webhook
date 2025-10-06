@@ -9,14 +9,14 @@ export default async function handler(req, res) {
   try {
     console.log("✅ New request from Wuilt:", req.body);
 
-    // إذا هذا اختبار التحقق من الـ Webhook (validation test)
+    // 🧩 Webhook validation test
     if (req.body.test === true && req.body.message) {
       console.log("⚙️ Webhook validation test request");
       return res.status(200).json({ success: true, message: "Webhook validated" });
     }
 
-    // البيانات العادية: استخرج order من داخل body
     const data = req.body.data;
+    const eventType = data?.event;
     const order = data?.payload?.order;
 
     if (!order) {
@@ -32,21 +32,43 @@ export default async function handler(req, res) {
     const customerName = customer.name || "عميلنا العزيز";
     let customerPhone = customer.phone || "";
 
-    // تأكد من صيغة رقم الهاتف الدولية
+    // ✅ Normalize phone format
     if (customerPhone.startsWith("0")) {
       customerPhone = "+2" + customerPhone.substring(1);
     } else if (!customerPhone.startsWith("+")) {
       customerPhone = "+2" + customerPhone;
     }
 
-    // استخدم رقم الطلب من orderSerial أو _id إذا غير موجود
     const orderNumber = order.orderSerial || order._id;
 
-    const message = `مرحبًا ${customerName} 👋
+    // 💬 Message text depends on the event type
+    let message = "";
+
+    switch (eventType) {
+      case "ORDER_CREATED":
+        message = `مرحبًا ${customerName} 👋
 تم استلام طلبك بنجاح ✅
 رقم الطلب: ${orderNumber}
 هنقوم بالتواصل معك قريب لتأكيد التفاصيل.
 شكرًا لاختيارك دجاج سيزر 🐔❤️`;
+        break;
+
+      case "ORDER_CANCELED":
+        message = `مرحبًا ${customerName} 👋
+يؤسفنا نبلغك إن طلبك رقم ${orderNumber} تم إلغاؤه ❌
+لو تم الإلغاء بالخطأ، برجاء التواصل مع خدمة عملاء دجاج سيزر 📞`;
+        break;
+
+      case "ORDER_FULFILLED":
+        message = `مرحبًا ${customerName} 👋
+طلبك رقم ${orderNumber} تم شحنه 🚚✨
+قريب جدًا هيوصل لعندك، شكرًا لثقتك في دجاج سيزر ❤️`;
+        break;
+
+      default:
+        console.log(`ℹ️ Event "${eventType}" not handled specifically.`);
+        return res.status(200).json({ success: true, message: "Event ignored" });
+    }
 
     console.log("📞 Sending WhatsApp to:", customerPhone);
     console.log("💬 Message:", message);
@@ -71,11 +93,9 @@ export default async function handler(req, res) {
     const result = await response.json();
     console.log("📦 WhatsApp API response:", result);
 
-    // لو الرسالة نجحت أو حتى فشلت، نرد 200 لـ Wuilt لأن الاستلام مهم
     return res.status(200).json({ success: true, result });
   } catch (error) {
     console.error("❌ Error in handler:", error);
-    // حتى في الأخطاء نرد 500 لكن ضروري نرد حاجة لـ Wuilt عشان ما يحسبها خطأ Webhook كامل
     return res.status(500).json({ success: false, message: error.message });
   }
 }
