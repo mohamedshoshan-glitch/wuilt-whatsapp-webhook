@@ -27,19 +27,17 @@ app.get("/api", (req, res) => {
 // استقبال بيانات الطلبات من Wuilt
 app.post("/api", async (req, res) => {
   try {
+    // 🔍 اطبع كل البيانات القادمة من Wuilt
+    console.log("📦 Incoming Wuilt payload:", JSON.stringify(req.body, null, 2));
+
     const data = req.body;
+    const eventType = data.event || data?.data?.event || data?.data?.status || "unknown";
+    const order = data.data || data.payload?.order || {};
 
-    if (!data || !data.event || !data.data) {
-      console.log("Invalid payload:", data);
-      return res.sendStatus(400);
-    }
-
-    const eventType = data.event;
-    const order = data.data;
     const customerName = order.customer?.name || "العميل";
     const customerPhone = order.customer?.phone?.replace("+", "");
-    const orderId = order.id;
-    const orderTotal = order.total || "غير محدد";
+    const orderId = order.id || order.orderSerial || "—";
+    const orderTotal = order.total || order.totalPrice?.amount || "غير محدد";
     const trackingNumber = order.tracking_number || "—";
     const deliveryEstimate = order.delivery_estimate || "قريبًا";
 
@@ -48,24 +46,29 @@ app.post("/api", async (req, res) => {
 
     switch (eventType) {
       case "order.created":
+      case "ORDER_CREATED":
         messageTemplate = `مرحبًا ${customerName} 👋\nتم استلام طلبك رقم ${orderId} بنجاح ✅\nقيمة الطلب: ${orderTotal}\nهنقوم بالتواصل معك قريب لتأكيد التفاصيل.\nشكرًا لاختيارك دجاج سيزر 🐔❤️`;
         break;
 
       case "order.canceled":
+      case "ORDER_CANCELED":
         messageTemplate = `مرحبًا ${customerName} 😔\nنأسف لإبلاغك أن طلب رقم ${orderId} تم إلغاؤه.\nلو رغبت بإعادة الطلب أو لديك استفسار، تواصل معنا: ${SUPPORT_PHONE}`;
         break;
 
       case "order.paid":
+      case "ORDER_PAID":
         messageTemplate = `مرحبًا ${customerName} ✅\nتم تأكيد الدفع لطلب رقم ${orderId} بمبلغ ${orderTotal}.\nسنبدأ في تجهيز طلبك الآن.`;
         break;
 
       case "order.fulfilled":
+      case "ORDER_FULFILLED":
         messageTemplate = `مرحبًا ${customerName} 🚚\nطلبك رقم ${orderId} خرج للشحن — متوقع الوصول خلال ${deliveryEstimate}.\nرقم التتبع: ${trackingNumber}`;
         break;
 
       default:
-        console.log("غير معروف نوع الحدث:", eventType);
-        return res.sendStatus(200);
+        console.log("⚠️ حدث غير معروف:", eventType);
+        messageTemplate = `مرحبًا ${customerName} 👋\nتم استلام طلبك رقم ${orderId} بنجاح ✅`;
+        break;
     }
 
     // إرسال الرسالة عبر واتساب
@@ -85,7 +88,7 @@ app.post("/api", async (req, res) => {
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("Error handling webhook:", err.response?.data || err.message);
+    console.error("❌ Error handling webhook:", err.response?.data || err.message);
     res.sendStatus(500);
   }
 });
