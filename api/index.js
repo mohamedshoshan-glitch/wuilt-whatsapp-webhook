@@ -1,70 +1,110 @@
-import axios from "axios";
+import fetch from "node-fetch";
+
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
+  if (req.method !== "POST") {
+    return res.status(200).send("✅ Wuilt WhatsApp Webhook is running");
+  }
 
   try {
-    const data = req.body.data || req.body; // بعض منصات wuilt ترسل داخل data
+    console.log("✅ New request from Wuilt:", req.body);
+
+    const data = req.body.data;
     const event = data?.event;
     const order = data?.payload?.order;
 
-    console.info("✅ New request from Wuilt:", data);
+    if (!event || !order) {
+      console.error("❌ Missing event or order in payload");
+      return res.status(400).json({ error: "Invalid payload" });
+    }
 
-    if (!order) throw new Error("No order found in payload");
+    const customer = order.customer || {};
+    let customerPhone = customer.phone || "";
+    const customerName = customer.name || "عميلنا العزيز";
 
-    const customer = order.customer;
-    const phone = customer?.phone?.replace(/\s+/g, "");
-    const name = customer?.name || "العميل";
+    // إصلاح صيغة الرقم الدولي
+    if (customerPhone.startsWith("0")) {
+      customerPhone = "+2" + customerPhone.substring(1);
+    } else if (!customerPhone.startsWith("+")) {
+      customerPhone = "+2" + customerPhone;
+    }
 
-    let message = "";
+    const orderNumber = order.orderSerial || order._id;
+
+    // 🧩 تحديد نوع الرسالة حسب الحدث
+    let templateName;
+    let messageParams = [];
 
     switch (event) {
-      case "ORDER_PLACED":
-        message = `مرحبًا ${name} 👋\nتم استلام طلبك بنجاح ✅\nرقم الطلب: ${order.orderSerial}\nهنقوم بالتواصل معك قريب لتأكيد التفاصيل.\nشكرًا لاختيارك دجاج سيزر 🐔❤️`;
+      case "ORDER_CREATED":
+        templateName = "order_confirmation";
+        messageParams = [customerName, orderNumber];
         break;
 
       case "ORDER_CANCELED":
-        message = `عزيزي ${name} 😔\nتم إلغاء طلبك رقم ${order.orderSerial}.\nلو تم الإلغاء عن طريق الخطأ، يمكنك إعادة الطلب من موقعنا www.ceasarchicken.com`;
+        templateName = "order_canceled";
+        messageParams = [customerName, orderNumber];
         break;
 
       case "ORDER_FULFILLED":
-        message = `أهلاً ${name} 🎉\nطلبك رقم ${order.orderSerial} تم تجهيزه وجاري شحنه إليك 🚚💨\nشكرًا لاختيارك دجاج سيزر 🐔`;
+        templateName = "order_shipped";
+        messageParams = [orderNumber, "الـ ٢٤ ساعة القادمة"];
         break;
 
       case "ORDER_REFUNDED":
-        message = `مرحبًا ${name} 👋\nتم رد المبلغ لطلبك رقم ${order.orderSerial} بنجاح 💰\nلو عندك أي استفسار، تواصل معنا على رقم الدعم.`;
+        templateName = "order_refunded";
+        messageParams = [customerName, orderNumber];
+        break;
+
+      case "ORDER_PAID":
+        templateName = "order_paid";
+        messageParams = [customerName, orderNumber];
         break;
 
       default:
-        console.info(`⚠️ Event ${event} غير مدعوم حاليًا.`);
-        return res.status(200).send("Ignored event");
+        console.log("ℹ️ Ignored event type:", event);
+        return res.status(200).json({ ignored: true });
     }
 
-    if (!phone) throw new Error("No phone number found");
+    console.log(`📩 Sending template "${templateName}" to ${customerPhone}`);
 
-    console.info("📞 Sending WhatsApp to:", phone);
-    console.info("💬 Message:", message);
-
-    const response = await axios.post(
-      `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    const response = await fetch(
+      `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`,
       {
-        messaging_product: "whatsapp",
-        to: phone,
-        text: { body: message },
-      },
-      {
+        method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: customerPhone,
+          type: "template",
+          template: {
+            name: templateName,
+            language: { code: "ar" },
+            components: [
+              {
+                type: "body",
+                parameters: messageParams.map((param) => ({
+                  type: "text",
+                  text: param,
+                })),
+              },
+            ],
+          },
+        }),
       }
     );
 
-    console.info("📦 WhatsApp API response:", response.data);
+    const result = await response.json();
+    console.log("📦 WhatsApp API response:", result);
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, result });
   } catch (error) {
-    console.error("❌ Error in webhook handler:", error.message);
-    return res.status(500).json({ error: error.message });
+    console.error("❌ Error in handler:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 }
