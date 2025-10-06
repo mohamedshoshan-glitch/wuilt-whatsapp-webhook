@@ -1,33 +1,39 @@
 // api/index.js
-
-// استبدل التوكن والبزنس ID ببياناتك من Meta for Developers
-const WHATSAPP_TOKEN = "EAAPnaEVSsi4BPi6XOmwzd058fOOIGZC3uJJbwUga0H8I4He7KL49HYZAxcJSlBVcmfrC2AHBYMA0iEeOtgbEnYBoAmNbcw0IyeJqw0W9XyZCzdOZCvqyVd9TVg4IDMbv24AvxfxIEPvyRuoeZBQvF5mq52glZChPSckrld7Oh9Ag3X8AFiO351zsiunkZB5uz0jaI16ZAEbDaIcbcCOfl8paodlpuXsZBcMhMvQENC592Wsv8hBl9Fq9jYYAgIQZDZD";
+const WHATSAPP_TOKEN = "EAAPnaEVSsi4BPpOj25BgAxqjxpEB2nlKvptoIm9z4Ni1C4apdJrIX6Faa6I09ZBktisZBtt4qCvtBZCbGgi3SFiv6515Cnhw4aFaQrocoEkKk5IA3SGDzehA4hwveWVfoNe27iHEukK4Aj0EoXE9oiFAsn4sFFVNoIzHUIS7IBi6jAF36gk1nF0AsjPyLIfMRw7R9uxSO493q6LnFcc0PMLKz3EJbHlq9kcDmZBJpTZAQVqoE7g9ZA5ujy8ckZD";
 const PHONE_NUMBER_ID = "839520552574293";
 
 export default async function handler(req, res) {
-  if (req.method === 'POST') {
+  if (req.method === "POST") {
     try {
+      console.log("✅ Received Order from Wuilt:", req.body);
+
       const order = req.body;
-
-      console.log("✅ New order received from Wuilt:", order);
-
-      // استخراج بيانات العميل من الطلب (عدّل حسب هيكل بيانات Wuilt)
-      const customerPhone = order.customer?.phone || "";
       const customerName = order.customer?.name || "عميلنا العزيز";
+      let customerPhone = order.customer?.phone || "";
 
-      // نص الرسالة
+      // تأكد إن الرقم بصيغة دولية (يبدأ بـ +2 مثلاً)
+      if (customerPhone.startsWith("0")) {
+        customerPhone = "+2" + customerPhone.substring(1);
+      } else if (!customerPhone.startsWith("+")) {
+        customerPhone = "+2" + customerPhone;
+      }
+
       const message = `مرحبًا ${customerName} 👋
 تم استلام طلبك بنجاح ✅
 رقم الطلب: ${order.id}
 هنقوم بالتواصل معاك قريب لتأكيد التفاصيل.
 شكرًا لاختيارك دجاج سيزر 🐔❤️`;
 
-      // إرسال الرسالة عبر واتساب Cloud API
-      if (customerPhone) {
-        await fetch(`https://graph.facebook.com/v20.0/${839520552574293}/messages`, {
+      // طباعة الرقم والرسالة للتأكد
+      console.log("📞 Sending WhatsApp to:", customerPhone);
+      console.log("💬 Message:", message);
+
+      const response = await fetch(
+        `https://graph.facebook.com/v20.0/${839520552574293}/messages`,
+        {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${EAAPnaEVSsi4BPi6XOmwzd058fOOIGZC3uJJbwUga0H8I4He7KL49HYZAxcJSlBVcmfrC2AHBYMA0iEeOtgbEnYBoAmNbcw0IyeJqw0W9XyZCzdOZCvqyVd9TVg4IDMbv24AvxfxIEPvyRuoeZBQvF5mq52glZChPSckrld7Oh9Ag3X8AFiO351zsiunkZB5uz0jaI16ZAEbDaIcbcCOfl8paodlpuXsZBcMhMvQENC592Wsv8hBl9Fq9jYYAgIQZDZD}`,
+            Authorization: `Bearer ${EAAPnaEVSsi4BPpOj25BgAxqjxpEB2nlKvptoIm9z4Ni1C4apdJrIX6Faa6I09ZBktisZBtt4qCvtBZCbGgi3SFiv6515Cnhw4aFaQrocoEkKk5IA3SGDzehA4hwveWVfoNe27iHEukK4Aj0EoXE9oiFAsn4sFFVNoIzHUIS7IBi6jAF36gk1nF0AsjPyLIfMRw7R9uxSO493q6LnFcc0PMLKz3EJbHlq9kcDmZBJpTZAQVqoE7g9ZA5ujy8ckZD}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -36,20 +42,20 @@ export default async function handler(req, res) {
             type: "text",
             text: { body: message },
           }),
-        });
-      }
+        }
+      );
 
-      return res.status(200).json({
-        status: "success",
-        message: "Order received and WhatsApp message sent",
-      });
+      const result = await response.json();
+      console.log("📦 WhatsApp API response:", result);
+
+      return res
+        .status(200)
+        .json({ status: "success", message: "Order processed" });
     } catch (error) {
       console.error("❌ Error:", error);
-      return res.status(500).json({
-        status: "error",
-        message: "Internal server error",
-        details: error.message,
-      });
+      return res
+        .status(500)
+        .json({ status: "error", message: error.message });
     }
   } else {
     return res.status(200).send("✅ Wuilt WhatsApp Webhook is running");
